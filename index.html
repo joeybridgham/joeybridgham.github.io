@@ -11,9 +11,9 @@
   --bg-soft:#0a0a0c;
   --surface:rgba(255,255,255,.045);
   --surface-border:rgba(255,255,255,.09);
-  --text:#f5f5f7;
-  --text-dim:#a1a1a6;
-  --text-faint:#6e6e73;
+  --text:#f7f7f9;
+  --text-dim:#bcc0c7;
+  --text-faint:#8c9099;
   --gold:#2997ff;
   --gold-soft:rgba(41,151,255,.14);
   --radius:22px;
@@ -27,9 +27,18 @@ body{
   font-family:"Times New Roman",Times,Georgia,serif;
   -webkit-font-smoothing:antialiased;
   overflow-x:hidden;
-  line-height:1.5;
+  line-height:1.62;
+  font-size:16.5px;
 }
 ::selection{background:var(--gold);color:#000}
+
+/* ---------- FULL-PAGE NETWORK BACKGROUND ---------- */
+.net-bg{position:fixed;inset:0;z-index:-1;pointer-events:none;background:#000}
+.net-bg canvas{width:100%;height:100%;display:block;opacity:.55}
+.net-bg::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse 60% 50% at 50% 22%,rgba(41,151,255,.10),transparent 70%);
+}
 
 /* ---------- NAV ---------- */
 nav{
@@ -119,7 +128,7 @@ section{max-width:1100px;margin:0 auto;padding:110px 24px}
   font-size:clamp(34px,5.5vw,56px);font-weight:700;letter-spacing:-.025em;line-height:1.08;
   margin-bottom:18px;
 }
-.section-sub{color:var(--text-dim);font-size:18px;max-width:620px;margin-bottom:56px}
+.section-sub{color:var(--text-dim);font-size:19px;line-height:1.6;max-width:640px;margin-bottom:56px}
 
 /* reveal on scroll */
 .reveal{opacity:0;transform:translateY(36px);transition:opacity .9s var(--ease),transform .9s var(--ease)}
@@ -164,7 +173,7 @@ section{max-width:1100px;margin:0 auto;padding:110px 24px}
   font-size:21px;font-weight:600;letter-spacing:-.015em;line-height:1.25;margin-bottom:12px;
   transform:translateZ(40px);
 }
-.card p{color:var(--text-dim);font-size:15px;line-height:1.6;transform:translateZ(20px)}
+.card p{color:var(--text-dim);font-size:15.5px;line-height:1.62;transform:translateZ(20px)}
 .card .chips{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px;transform:translateZ(25px)}
 .chip{
   font-size:11.5px;color:var(--text-dim);border:1px solid rgba(255,255,255,.12);
@@ -194,7 +203,7 @@ section{max-width:1100px;margin:0 auto;padding:110px 24px}
 .t-date{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-weight:600}
 .t-item h3{font-size:20px;font-weight:600;letter-spacing:-.01em;margin-top:6px}
 .t-org{color:var(--text-faint);font-size:14px;margin-top:2px}
-.t-item p{color:var(--text-dim);font-size:15px;line-height:1.65;margin-top:10px;max-width:680px}
+.t-item p{color:var(--text-dim);font-size:15.5px;line-height:1.68;margin-top:10px;max-width:680px}
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:72px}
 @media(max-width:860px){.two-col{grid-template-columns:1fr;gap:64px}}
 .col-heading{font-size:24px;font-weight:600;letter-spacing:-.015em;margin-bottom:36px;display:flex;align-items:center;gap:12px}
@@ -243,6 +252,8 @@ footer a:hover{color:var(--gold)}
 </head>
 <body>
 
+<div class="net-bg"><canvas id="stars"></canvas></div>
+
 <nav>
   <div class="nav-inner">
     <a class="nav-name" href="#top">Joey Bridgham</a>
@@ -257,7 +268,7 @@ footer a:hover{color:var(--gold)}
 </nav>
 
 <header class="hero" id="top">
-  <div class="hero-bg"><canvas id="stars"></canvas></div>
+  <div class="hero-bg"></div>
   <div class="hero-eyebrow">Finance · Valuation · Equity Research</div>
   <h1 id="heroTitle">Joey Bridgham</h1>
   <p class="hero-sub">MS Finance, graduating Summer 2026 from UNCW. Co-managed a $3M live equity portfolio, builds DCF and options pricing models, and turns financial data into investment decisions.</p>
@@ -562,70 +573,110 @@ window.addEventListener('scroll',()=>{
   }
 },{passive:true});
 
-// 3D starfield — crisp, full native resolution
+// 3D connected-node network — subtle data-mesh behind the name
 (function(){
   const canvas = document.getElementById('stars');
   if(!canvas) return;
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const ctx = canvas.getContext('2d');
-  let W,H,dpr,stars=[],mx=0,my=0;
-  const N = 5000, DEPTH = 1.6;
+  let W,H,dpr,nodes=[],px=[],py=[],mx=0,my=0;
+  const LINK = 168;          // max distance to draw a connecting line
+  const LINK2 = LINK*LINK;
+  const TRI = 132;           // max side length for a filled triangle facet
+  const TRI2 = TRI*TRI;
+  const PARALLAX = 34;       // how much the mesh shifts with the cursor
 
   function resize(){
     dpr = devicePixelRatio || 1;
     W = canvas.clientWidth; H = canvas.clientHeight;
     canvas.width = W*dpr; canvas.height = H*dpr;
     ctx.setTransform(dpr,0,0,dpr,0,0);
+    build();
   }
-  function spawn(z){
-    return {
-      x:(Math.random()*2-1)*DEPTH*1.4,
-      y:(Math.random()*2-1)*DEPTH*1.2,
-      z: z!==undefined ? z : Math.random()*DEPTH+0.05,
-      tw: Math.random()*Math.PI*2,
-      blue: Math.random()<0.3
-    };
+  function build(){
+    const count = Math.max(30, Math.min(95, Math.round(W*H/16000)));
+    nodes = []; px = new Array(count); py = new Array(count);
+    for(let i=0;i<count;i++){
+      nodes.push({
+        x: Math.random()*W,
+        y: Math.random()*H,
+        vx: (Math.random()*2-1)*0.15,
+        vy: (Math.random()*2-1)*0.15,
+        z: 0.35 + Math.random()*0.65   // depth: 0.35 far … 1.0 near
+      });
+    }
   }
-  function init(){ stars=[]; for(let i=0;i<N;i++) stars.push(spawn()); }
-
   addEventListener('mousemove',e=>{
     mx = (e.clientX/innerWidth - .5);
     my = (e.clientY/innerHeight - .5);
   },{passive:true});
 
-  let t=0;
   function frame(){
-    t += 0.016;
     ctx.clearRect(0,0,W,H);
-    const cx = W/2 + mx*-22, cy = H*0.42 + my*-22;
-    const f = Math.min(W,H)*0.62;
-    for(const s of stars){
+    const n = nodes.length;
+    // move + project (with cursor parallax) once per node
+    for(let i=0;i<n;i++){
+      const nd = nodes[i];
       if(!reduced){
-        s.z -= 0.0011;
-        if(s.z <= 0.05){ Object.assign(s, spawn(DEPTH)); }
+        nd.x += nd.vx; nd.y += nd.vy;
+        if(nd.x < -20) nd.x = W+20; else if(nd.x > W+20) nd.x = -20;
+        if(nd.y < -20) nd.y = H+20; else if(nd.y > H+20) nd.y = -20;
       }
-      const k = f/s.z;
-      const sx = cx + s.x*k*0.5, sy = cy + s.y*k*0.5;
-      if(sx<-10||sx>W+10||sy<-10||sy>H+10) continue;
-      const near = 1 - s.z/DEPTH;
-      const r = 0.5 + near*1.7;
-      const twinkle = reduced ? 1 : 0.7 + 0.3*Math.sin(t*2 + s.tw);
-      const a = (0.28 + near*0.72) * twinkle;
+      px[i] = nd.x + mx*PARALLAX*nd.z;
+      py[i] = nd.y + my*PARALLAX*nd.z;
+    }
+    // geometric facets: faint filled triangles among close triplets
+    for(let i=0;i<n;i++){
+      for(let j=i+1;j<n;j++){
+        const dxij=px[i]-px[j], dyij=py[i]-py[j];
+        const dij2=dxij*dxij+dyij*dyij;
+        if(dij2>TRI2) continue;
+        for(let k=j+1;k<n;k++){
+          const dxik=px[i]-px[k], dyik=py[i]-py[k];
+          if(dxik*dxik+dyik*dyik>TRI2) continue;
+          const dxjk=px[j]-px[k], dyjk=py[j]-py[k];
+          if(dxjk*dxjk+dyjk*dyjk>TRI2) continue;
+          const zavg=(nodes[i].z+nodes[j].z+nodes[k].z)/3;
+          ctx.fillStyle = `rgba(41,151,255,${0.05*zavg})`;
+          ctx.beginPath();
+          ctx.moveTo(px[i],py[i]); ctx.lineTo(px[j],py[j]); ctx.lineTo(px[k],py[k]);
+          ctx.closePath(); ctx.fill();
+        }
+      }
+    }
+    // connecting lines (depth-aware opacity)
+    for(let i=0;i<n;i++){
+      for(let j=i+1;j<n;j++){
+        const dx=px[i]-px[j], dy=py[i]-py[j];
+        const d2=dx*dx+dy*dy;
+        if(d2<LINK2){
+          const d=Math.sqrt(d2);
+          const o=(1 - d/LINK) * 0.4 * ((nodes[i].z+nodes[j].z)/2);
+          ctx.strokeStyle = `rgba(120,170,255,${o})`;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(px[i],py[i]); ctx.lineTo(px[j],py[j]); ctx.stroke();
+        }
+      }
+    }
+    // nodes
+    for(let i=0;i<n;i++){
+      const z=nodes[i].z, r=1.1+z*1.7;
       ctx.beginPath();
-      ctx.arc(sx,sy,r,0,Math.PI*2);
-      ctx.fillStyle = s.blue ? `rgba(120,180,255,${a})` : `rgba(240,244,255,${a})`;
+      ctx.arc(px[i],py[i],r,0,Math.PI*2);
+      ctx.fillStyle = `rgba(205,225,255,${0.32 + z*0.5})`;
       ctx.fill();
-      if(near>0.78){
+      if(z>0.8){
         ctx.beginPath();
-        ctx.arc(sx,sy,r*2.6,0,Math.PI*2);
-        ctx.fillStyle = `rgba(41,151,255,${a*0.12})`;
+        ctx.arc(px[i],py[i],r*2.4,0,Math.PI*2);
+        ctx.fillStyle = `rgba(41,151,255,${(z-0.8)*0.5})`;
         ctx.fill();
       }
     }
     if(!reduced) requestAnimationFrame(frame);
   }
   addEventListener('resize',()=>{resize();},{passive:true});
-  resize(); init(); frame();
+  resize(); frame();
 })();
 </script>
 </body>
