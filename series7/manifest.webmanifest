@@ -1,0 +1,14 @@
+{
+  "name": "Series 7 Daily Ten",
+  "short_name": "Series 7",
+  "description": "Ten Series 7 practice questions a day, with explanations and a streak counter.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
